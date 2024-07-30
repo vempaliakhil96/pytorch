@@ -24,6 +24,11 @@ call %INSTALLER_DIR%\install_sccache.bat
 if errorlevel 1 goto fail
 if not errorlevel 0 goto fail
 
+if "%USE_XPU%"=="1" (
+  :: Install oneAPI bundle
+  call %INSTALLER_DIR%\install_xpu.bat
+)
+
 :: Miniconda has been installed as part of the Windows AMI with all the dependencies.
 :: We just need to activate it here
 call %INSTALLER_DIR%\activate_miniconda3.bat
