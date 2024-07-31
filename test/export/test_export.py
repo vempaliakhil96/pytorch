@@ -61,6 +61,7 @@ from torch.utils._pytree import (
     treespec_dumps,
     treespec_loads,
 )
+from torch.utils._triton import has_triton
 
 
 try:
@@ -280,6 +281,26 @@ class TestExport(TestCase):
         f = Module()
         inp = ([torch.ones(1, 3)], torch.ones(1, 3))
         self._test_export_same_as_eager(f, inp)
+
+    @unittest.skipIf(not has_triton(), "Skip if CPU or GPU isn't supported by Triton")
+    def test_user_defined_triton_kernel(self):
+        from torch.testing._internal.triton_utils import add_kernel
+
+        class Module(torch.nn.Module):
+            def forward(self, x, y):
+                out = torch.empty_like(x)
+                add_kernel[1,](
+                    in_ptr0=x,
+                    in_ptr1=y,
+                    out_ptr=out,
+                    n_elements=x.numel(),
+                    BLOCK_SIZE=1,
+                )
+                return out
+
+        f = Module()
+        inp = (torch.ones(1, 3, device="cuda"), torch.ones(1, 3, device="cuda"))
+        gm = torch.export._trace._export(f, inp, pre_dispatch=True).module()
 
     def test_no_tensor_computation(self):
         class Module(torch.nn.Module):
