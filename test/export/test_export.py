@@ -275,6 +275,19 @@ class TestExport(TestCase):
         #     exported_program.module()(*args, **reversed_kwargs), f(*args, **reversed_kwargs)
         # )
 
+    def _check_dynamic_shapes_specs_and_shapes(self, model, inputs, specs, passing_shapes, failing_shapes):
+        # exports with a list of equivalent dynamic shapes specs,
+        # then tests for pass/fail on list of shapes
+        for _specs in specs:
+            ep = export(model, inputs, dynamic_shapes=_specs)
+            for shapes in passing_shapes:
+                test_inputs = (torch.randn(*shape) for shape in shapes)
+                ep.module()(*test_inputs)
+            for shapes in failing_shapes:
+                test_inputs = (torch.randn(*shape) for shape in shapes)
+                with self.assertRaisesRegex(RuntimeError, ""):
+                    ep.module()(*test_inputs)
+
     def test_basic(self):
         class Module(torch.nn.Module):
             def forward(self, x, y):
@@ -6772,23 +6785,10 @@ def forward(self, x, y):
                 self.assertTrue(False)
 
 
-    def test_specs_for_automatic_dynamic_shapes(self):
-        # Run tests on 3 models for automatic dynamic shapes specs, verifying that automatic dynamism
+    def test_automatic_dynamic_shapes_simple_equality(self):
+        # The next 3 test cases tests for automatic dynamic shapes specs, verifying that automatic dynamism
         # leads to replacement symbols being set for equalities, and inferred relationships being checked
         # with runtime asserts. Check that we specialize to static values when the program says so.
-
-        def export_and_check_inputs(model, inputs, specs, passing_shapes, failing_shapes):
-            # exports with a list of equivalent dynamic shapes specs,
-            # then tests for pass/fail on list of shapes
-            for _specs in specs:
-                ep = export(model, inputs, dynamic_shapes=_specs)
-                for shapes in passing_shapes:
-                    test_inputs = (torch.randn(*shape) for shape in shapes)
-                    ep.module()(*test_inputs)
-                for shapes in failing_shapes:
-                    test_inputs = (torch.randn(*shape) for shape in shapes)
-                    with self.assertRaisesRegex(RuntimeError, ""):
-                        ep.module()(*test_inputs)
 
         # case 1: direct equality between symbols
         class SimpleEquality(torch.nn.Module):
@@ -6798,7 +6798,7 @@ def forward(self, x, y):
 
         inputs = tuple(torch.randn(6, 3) for _ in range(3))
         # fully dynamic
-        export_and_check_inputs(
+        self._check_dynamic_shapes_specs_and_shapes(
             SimpleEquality(), inputs,
             specs=[
                 True,
@@ -6818,7 +6818,7 @@ def forward(self, x, y):
             ]
         )
         # static s1
-        export_and_check_inputs(
+        self._check_dynamic_shapes_specs_and_shapes(
             # specifying just one dimension as static should be enough to specialize all s1
             SimpleEquality(), inputs,
             specs=[
@@ -6837,7 +6837,7 @@ def forward(self, x, y):
             ]
         )
         # fully static
-        export_and_check_inputs(
+        self._check_dynamic_shapes_specs_and_shapes(
             # this should specialize all
             SimpleEquality(), inputs,
             specs=[
@@ -6853,6 +6853,7 @@ def forward(self, x, y):
             ]
         )
 
+    def test_automatic_dynamic_shapes_constant_relation(self):
         # case 2: related by constant: s0 + 4 = s1
         class OffBy4(torch.nn.Module):
             def forward(self, x, y):
@@ -6860,7 +6861,7 @@ def forward(self, x, y):
 
         inputs = (torch.randn(6), torch.randn(10))
         # fully dynamic
-        export_and_check_inputs(
+        self._check_dynamic_shapes_specs_and_shapes(
             OffBy4(), inputs,
             specs=[
                 True,
@@ -6876,7 +6877,7 @@ def forward(self, x, y):
             ]
         )
         # static s1 should specialize s0
-        export_and_check_inputs(
+        self._check_dynamic_shapes_specs_and_shapes(
             OffBy4(), inputs,
             specs=[
                 {"x": (True,), "y": (None,)},
@@ -6891,6 +6892,7 @@ def forward(self, x, y):
             ],
         )
 
+    def test_automatic_dynamic_shapes_linear_relation(self):
         # case 3: linear relation
         class LinearRel(torch.nn.Module):
             def forward(self, x, y):
@@ -6901,7 +6903,7 @@ def forward(self, x, y):
         inputs = (torch.randn(21), torch.randn(5))
 
         # fully dynamic
-        export_and_check_inputs(
+        self._check_dynamic_shapes_specs_and_shapes(
             LinearRel(), inputs,
             specs=[
                 True,
@@ -6919,7 +6921,7 @@ def forward(self, x, y):
             ],
         )
         # static s1 shouldn't actually specialize s0 (guard: (s0 + 2) // 4 == 5)
-        export_and_check_inputs(
+        self._check_dynamic_shapes_specs_and_shapes(
             LinearRel(), inputs,
             specs=[
                 (True, None),
@@ -6936,7 +6938,7 @@ def forward(self, x, y):
             ],
         )
         # but static s0 will definitely specialize s1 (guard: (21 + 2) // 4 == s1 -> 5 == s1)
-        export_and_check_inputs(
+        self._check_dynamic_shapes_specs_and_shapes(
             LinearRel(), inputs,
             specs=[
                 (None, True),

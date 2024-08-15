@@ -1613,8 +1613,6 @@ class DynamicDimConstraintPrinter(StrPrinter):
     def print_source(self, source) -> str:
         if self.source_name_to_debug_name:
             return source.name()
-        if isinstance(source, torch._dynamo.source.ConstantSource):
-            return source.source_name
         return f"dynamic_dim({source.base.name()}, {source.idx})"
 
     def _print_Symbol(self, expr) -> str:
@@ -1885,8 +1883,7 @@ class DimConstraints:
                 if s not in self._substitutions or not sympy.checksol(congruence, {s: self._substitutions[s]}):
                     if self._is_supported_congruence(congruence):
                         base, divisor = congruence.args
-                        src_name = self._dcp.symbol_to_source[s][0].name()
-                        tmp_name = f"_{self._dcp.source_name_to_debug_name.get(src_name, src_name)}"
+                        tmp_name = f"_{self._dcp.source_name_to_debug_name[self._dcp.symbol_to_source[s][0].name()]}"
                         tmp = sympy.Symbol(tmp_name, integer=True)
                         from torch._dynamo.source import ConstantSource
                         self._dcp.symbol_to_source[tmp] = [ConstantSource(tmp_name)]
