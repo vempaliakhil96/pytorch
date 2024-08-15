@@ -972,7 +972,10 @@ def _transform_shapes_for_default_dynamic(
         elif shape == True:
             out = None
         elif shape is None and isinstance(tensor, torch.Tensor):
-            out = tuple(tensor.shape) or None
+            out = []
+            for i, val in enumerate(tensor.shape):
+                out.append(None if _marked_dynamic(tensor, i) else val)
+            out = out or None
         return out
         
     def transform_shape(path, t, dynamic_shape):

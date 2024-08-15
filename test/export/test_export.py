@@ -4254,8 +4254,6 @@ def forward(self, b_a_buffer, x):
             )
 
     @testing.expectedFailureSerDer  # We don't preserve metadata on graph module
-    @testing.expectedFailureNonStrict
-    @testing.expectedFailureTrainingIRToRunDecompNonStrict
     def test_retrace_graph_level_meta_preservation(self):
         class Foo(torch.nn.Module):
             def __init__(self) -> None:
@@ -4270,11 +4268,11 @@ def forward(self, b_a_buffer, x):
         dim0_x = torch.export.Dim("dim0_x", min=6)
         exported = torch.export.export(Foo(), (inp,), dynamic_shapes={"x": {0: dim0_x}})
         stateful_module = exported.module()
-        self.assertTrue(len(stateful_module.meta["input_shape_constraints"]), 1)
+        self.assertTrue(len(stateful_module.meta["input_shape_constraints"]), 2)
 
         re_exported = export(stateful_module, (inp,), dynamic_shapes=({0: dim0_x},))
         self.assertTrue(
-            len(re_exported.graph_module.meta["input_shape_constraints"]) == 1
+            len(re_exported.graph_module.meta["input_shape_constraints"]) == 2
         )
         self.assertTrue(
             torch.allclose(
@@ -4285,7 +4283,7 @@ def forward(self, b_a_buffer, x):
 
         re_exported_v2 = export(exported.module(), (inp,))
         self.assertTrue(
-            len(re_exported_v2.graph_module.meta["input_shape_constraints"]) == 0
+            len(re_exported_v2.graph_module.meta["input_shape_constraints"]) == 2
         )
         self.assertTrue(
             torch.allclose(
