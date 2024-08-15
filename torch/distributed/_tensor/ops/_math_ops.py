@@ -15,6 +15,7 @@ from torch.distributed._tensor._op_schema import (
     RuntimeSchemaInfo,
     TupleStrategy,
 )
+from torch.distributed._tensor._utils import normalize_to_torch_size
 from torch.distributed._tensor.ops.utils import (
     as_list,
     expand_to_full_mesh_op_strategy,
@@ -22,7 +23,6 @@ from torch.distributed._tensor.ops.utils import (
     is_tensor_evenly_shardable,
     normalize_dim,
     normalize_dims,
-    normalize_to_torch_size,
     register_op_strategy,
 )
 from torch.distributed._tensor.placement_types import (
@@ -457,10 +457,11 @@ def linalg_replicate_strategy(mesh: DeviceMesh, op_schema: OpSchema) -> OpStrate
 
 
 @register_op_strategy(
-    [aten._log_softmax.default, aten._softmax.default], schema_info=RuntimeSchemaInfo(1)
+    [aten._log_softmax.default, aten._softmax.default, aten._safe_softmax.default],
+    schema_info=RuntimeSchemaInfo(1),
 )
 def softmax_strategy(mesh: DeviceMesh, op_schema: OpSchema) -> OpStrategy:
-    input_strategy, softmax_dim, _ = op_schema.args_schema
+    input_strategy, softmax_dim, *_ = op_schema.args_schema
     input_strategy = cast(OpStrategy, input_strategy)
     softmax_dim = cast(int, softmax_dim)
     softmax_dim = normalize_dim(softmax_dim, input_strategy.ndim)
@@ -1070,6 +1071,10 @@ def distribute_tensor_scale(mesh: DeviceMesh, op_schema: OpSchema) -> TupleStrat
     assert isinstance(found_inf, OpStrategy)
     assert isinstance(inv_scale, OpStrategy)
 
+    found_inv_input_placements: List[Placement] = []
+    found_inv_input_placements.append(Partial("max"))
+    found_inf.strategies[0].output_spec.placements = tuple(found_inv_input_placements)
+
     output_tuple_strategy_childs: List[OpStrategy] = []
     for op_strategy in scaled_grad.childs:
         assert isinstance(op_strategy, OpStrategy), f"{op_strategy}"
@@ -1092,12 +1097,10 @@ def distribute_tensor_scale(mesh: DeviceMesh, op_schema: OpSchema) -> TupleStrat
             generate_redistribute_costs(op_strategy, scaled_grad_target_spec)
         ]
 
-        found_inv_output_placements: List[Placement] = []
-        found_inv_output_placements.append(Replicate())
         found_inf_spec = found_inf.strategies[0].output_spec
         found_inf_target_spec = DTensorSpec(
             mesh=mesh,
-            placements=tuple(found_inv_output_placements),
+            placements=found_inf_spec.placements,
             tensor_meta=found_inf_spec.tensor_meta,
         )
         input_specs.append(found_inf_target_spec)

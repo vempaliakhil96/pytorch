@@ -281,10 +281,12 @@ class GradScaler:
                         per_device_found_inf.get(device),
                         per_device_inv_scale.get(device),
                     )
-                    if isinstance(grads[0], torch.distributed._tensor.DTensor):
-                        torch.distributed.all_reduce(
-                            per_device_found_inf.get(device), op=torch.distributed.ReduceOp.MAX
+                    if type(grads[0]) != torch.Tensor:
+                        reduce_result = (
+                            per_device_found_inf.get(device).max().full_tensor()
                         )
+                        per_device_found_inf = _MultiDeviceReplicator(reduce_result)
+                        per_device_found_inf.get(device)
 
         return per_device_found_inf._per_device_tensors
 
@@ -337,7 +339,8 @@ class GradScaler:
         # FP32 division can be imprecise for certain compile options, so we carry out the reciprocal in FP64.
         assert self._scale is not None
         inv_scale = self._scale.double().reciprocal().float()
-        found_inf = torch.full((), 0.0, dtype=torch.float32, device=self._scale.device)
+        grad_tensor = optimizer.param_groups[0]["params"][0]
+        found_inf = grad_tensor.new_full((), 0.0)
 
         optimizer_state["found_inf_per_device"] = self._unscale_grads_(
             optimizer, inv_scale, found_inf, False
