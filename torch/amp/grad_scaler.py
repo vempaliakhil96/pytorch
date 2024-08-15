@@ -282,9 +282,12 @@ class GradScaler:
                         per_device_inv_scale.get(device),
                     )
                     if type(grads[0]) != torch.Tensor:
-                        reduce_result = (
-                            per_device_found_inf.get(device).max().full_tensor()
-                        )
+                        reduce_result = found_inf
+                        # max_tensor is a DTensor here but not import here, add `hasattr` to avoid the
+                        # lintruner error:  "Tensor" has no attribute "full_tensor"
+                        max_tensor = per_device_found_inf.get(device).max()
+                        if hasattr(max_tensor, "full_tensor"):
+                            reduce_result = max_tensor.full_tensor()
                         per_device_found_inf = _MultiDeviceReplicator(reduce_result)
                         per_device_found_inf.get(device)
 
