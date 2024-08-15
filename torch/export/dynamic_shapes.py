@@ -806,7 +806,11 @@ def _check_dynamic_shapes(
     """
     from torch._dynamo.exc import UserError, UserErrorType
 
-    if dynamic_shapes is None or len(dynamic_shapes) == 0:
+    if (
+        dynamic_shapes == True
+        or dynamic_shapes is None
+        or len(dynamic_shapes) == 0
+    ):
         return
     if isinstance(dynamic_shapes, (tuple, list)):
         combined_args = type(dynamic_shapes)(combined_args.values())  # type: ignore[assignment, misc]
@@ -832,32 +836,32 @@ def _check_dynamic_shapes(
             for i, dim in shape.items():
                 if isinstance(dim, _Dim):
                     check_same_bounds(dim)
-                elif not isinstance(dim, int) and dim is not None:
+                elif not isinstance(dim, int) and dim not in [None, True]:
                     raise UserError(
                         UserErrorType.INVALID_INPUT,
                         f"Unexpected dimension mapped to index {i} in input tensor shape {shape} "
                         f"specified at `dynamic_shapes{keystr(path)}` "
-                        f"(expected None, an int, or a Dim, but got {dim} instead)",
+                        f"(expected None, True, an int, or a Dim, but got {dim} instead)",
                         case_name="dynamic_shapes_validation",
                     )
         elif isinstance(shape, (tuple, list)):
             for i, dim in enumerate(shape):
                 if isinstance(dim, _Dim):
                     check_same_bounds(dim)
-                elif not isinstance(dim, int) and dim is not None:
+                elif not isinstance(dim, int) and dim not in [None, True]:
                     raise UserError(
                         UserErrorType.INVALID_INPUT,
                         f"Unexpected dimension #{i} in input tensor shape {shape} "
                         f"specified at `dynamic_shapes{keystr(path)}` "
-                        f"(expected None, an int, or a Dim, but got {dim} instead)",
+                        f"(expected None, True, an int, or a Dim, but got {dim} instead)",
                         case_name="dynamic_shapes_validation",
                     )
-        elif shape is not None:
+        elif shape not in [None, True]:
             raise UserError(
                 UserErrorType.INVALID_INPUT,
                 f"Unexpected input tensor shape {shape} specified at `dynamic_shapes{keystr(path)}` "
                 f"(expected either a list/tuple of dimensions, or a dict mapping indices to dimensions,"
-                f" where each dimension is None, an int, or a Dim)",
+                f" where each dimension is None, True, an int, or a Dim)",
                 case_name="dynamic_shapes_validation",
             )
 
@@ -905,6 +909,122 @@ def _check_dynamic_shapes(
     _tree_map_with_path(check_shape, combined_args, dynamic_shapes, tree_name="inputs")
 
 
+def _transform_shapes_for_default_dynamic(
+    combined_args: Dict[str, Any],
+    dynamic_shapes: Union[Dict[str, Any], Tuple[Any], List[Any], None],
+) -> Union[Dict[str, Any], Tuple[Any], List[Any], None]:
+    """
+    In the long run this might not be needed, but this exists because export.export() and _dynamo.export()
+    historically have different semantics for how dynamic_shapes are specified, but go through the same
+    process of producing constraints, and now both use assume_static_by_default=False.
+
+    For _dynamo.export(), the semantics for dynamic_shapes are:
+    - None: dynamic, allocated a symbol
+    - Dim/DerivedDim: a strict assertion on the min/max range for this symbol, and require a specification
+      for all dims governed by this symbol (i.e. relations, equality, linear relations, etc.)
+
+    For export.export(), historically dynamism for unspecified dims has been undesirable, so the semantics are:
+    - True: dynamic, allocated a symbol
+    - None/unspecified: static
+    - Dim/DerivedDims: also a strict assertion
+
+    To allow both APIs to follow the same process for producing constraints, this function converts dynamic_shapes
+    for export.export() to be compatible with _process_dynamic_shapes() and assume_static_by_default=False, turning them
+    into essentially what they'd look like for _dynamo.export().
+
+    An example conversion might look like, for a 3-d input tensor:
+    
+        input spec: {
+            0: True,
+            1: None,
+            2: Dim("dx"),
+        }
+        output spec: {
+            0: None,  # None: dynamic by default
+            1: 32,  # explicitly provide static shape
+            2: Dim("dx"),  # remains the same
+        }
+    """
+    def _tree_map_helper(tree, val):
+        """
+        If the user generally specifies dynamic_shapes=None for a pytree input,
+        we'd like to convert this into a tree of Nones following the input spec,
+        so we can explicitly specify static dims for all tensor dimensions.
+        Non-builtin types for pytree (e.g. custom dataclasses) creates some difficulty,
+        in which case the correct format is a list containing specs for each child attribute.
+        """
+        if (node_type := _get_node_type(tree)) not in SUPPORTED_NODES:  # is_leaf
+            return val
+        flatten_fn = SUPPORTED_NODES[node_type].flatten_fn
+        child_pytrees, context = flatten_fn(tree)  # flatten from whatever original type
+        unflatten_fn = SUPPORTED_NODES[
+            node_type if node_type in BUILTIN_TYPES else list
+        ].unflatten_fn
+        children = [
+            _tree_map_helper(child, val) for child in child_pytrees
+        ]
+        return unflatten_fn(children, context)  # unflatten into original type, or list if not built-in type
+
+    if dynamic_shapes == True:  # dynamic by default
+        return None
+    elif dynamic_shapes is None or len(dynamic_shapes) == 0:  # create pytree structure of static dim
+        dynamic_shapes = _tree_map_helper(combined_args, None)
+    if isinstance(dynamic_shapes, (tuple, list)):
+        combined_args = type(dynamic_shapes)(combined_args.values())
+    
+    def transform_shapes(path, tensor, shape):
+        def _marked_dynamic(tensor, i):
+            return i in getattr(tensor, "_dynamo_dynamic_indices", set())
+
+        if isinstance(shape, dict):
+            out = {}
+            for i, val in enumerate(tensor.shape):
+                dim = shape.get(i, None)
+                if _marked_dynamic(tensor, i) or dim == True:
+                    # don't have to specify anything if dynamic
+                    # None also works, since assume_static_by_default=False
+                    continue
+                elif isinstance(dim, _Dim):
+                    out[i] = dim
+                elif isinstance(dim, int):
+                    # important that this is dim and not val,
+                    # so we can raise error if user-specified dim != val
+                    out[i] = dim
+                else:
+                    # make explicitly static
+                    assert dim is None
+                    out[i] = val
+        elif isinstance(shape, (tuple, list)):
+            out = []
+            for i, val in enumerate(tensor.shape):
+                dim = shape[i]
+                if _marked_dynamic(tensor, i) or dim == True:
+                    out.append(None)
+                elif isinstance(dim, _Dim):
+                    out.append(dim)
+                elif isinstance(dim, int):
+                    out.append(dim)
+                else:
+                    assert dim is None
+                    out.append(val)
+            out = type(shape)(out)
+        elif shape == True:
+            out = None
+        elif shape is None and isinstance(tensor, torch.Tensor):
+            out = []
+            for i, val in enumerate(tensor.shape):
+                out.append(None if _marked_dynamic(tensor, i) else val)
+            out = out or None
+        return out
+        
+    def transform_shape(path, t, dynamic_shape):
+        if isinstance(t, torch.Tensor):
+            return transform_shapes(path, t, dynamic_shape)
+
+    result = _tree_map_with_path(transform_shape, combined_args, dynamic_shapes, tree_name="inputs")
+    return result
+
+
 def _process_dynamic_shapes(
     combined_args: Dict[str, Any],
     dynamic_shapes: Union[Dict[str, Any], Tuple[Any], List[Any], None],
@@ -914,7 +1034,11 @@ def _process_dynamic_shapes(
     """
     from torch._dynamo.exc import UserError, UserErrorType
 
-    if dynamic_shapes is None or len(dynamic_shapes) == 0:
+    if (
+        dynamic_shapes == True
+        or dynamic_shapes is None
+        or len(dynamic_shapes) == 0
+    ):
         return []
     if isinstance(dynamic_shapes, (tuple, list)):
         combined_args = type(dynamic_shapes)(combined_args.values())  # type: ignore[assignment, misc]
