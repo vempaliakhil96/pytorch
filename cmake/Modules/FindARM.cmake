@@ -22,6 +22,15 @@ IF(CMAKE_SYSTEM_NAME MATCHES "Linux")
       set(ASIMD_FOUND false CACHE BOOL "ASIMD/NEON available on host")
    ENDIF (ASIMD_TRUE)
 
+   #sve instruction can be found on the majority part of modern ARM processor
+   STRING(REGEX REPLACE "^.*(sve).*$" "\\1" SVE_THERE ${CPUINFO})
+   STRING(COMPARE EQUAL "sve" "${SVE_THERE}" SVE_TRUE)
+   IF (SVE_TRUE)
+      set(SVE_FOUND true CACHE BOOL "SVE available on host")
+   ELSE (SVE_TRUE)
+      set(SVE_FOUND false CACHE BOOL "SVE available on host")
+   ENDIF (SVE_TRUE)
+
    #Find the processor type (for now OMAP3 or OMAP4)
    STRING(REGEX REPLACE "^.*(OMAP3).*$" "\\1" OMAP3_THERE ${CPUINFO})
    STRING(COMPARE EQUAL "OMAP3" "${OMAP3_THERE}" OMAP3_TRUE)

@@ -103,6 +103,19 @@ endif()
 # Also, we will turn off deprecated-declarations
 # due to protobuf.
 
+# ---[ Check if the compiler has SVE support.
+if(NOT INTERN_BUILD_MOBILE)
+  find_package(ARM) # checks SVE
+  if(SVE_FOUND)
+    message(STATUS "Current COMPILER supports sve extension. Will build perfkernels.")
+    # Also see CMakeLists.txt under caffe2/perfkernels.
+    set(CAFFE2_PERF_WITH_SVE 1)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCAFFE2_PERF_WITH_SVE")
+  else()
+    message(STATUS "Current compiler does not sve extension. Will not build perfkernels.")
+  endif()
+endif()
+
 if(IOS AND (${IOS_ARCH} MATCHES "armv7*"))
   add_definitions("-mfpu=neon-fp16")
   add_definitions("-arch" ${IOS_ARCH})
