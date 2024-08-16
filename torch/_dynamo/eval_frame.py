@@ -55,11 +55,7 @@ from torch._C._dynamo.eval_frame import (  # noqa: F401
 from torch._dispatch.python import enable_python_dispatcher
 from torch._subclasses.fake_tensor import unset_fake_temporarily
 from torch._utils_internal import justknobs_check, log_export_usage
-from torch.export.dynamic_shapes import (
-    _check_dynamic_shapes,
-    _combine_args,
-    _process_dynamic_shapes,
-)
+from torch.export.dynamic_shapes import _combine_args, _process_dynamic_shapes
 from torch.fx import GraphModule
 from torch.fx.experimental.proxy_tensor import make_fx
 from torch.fx.experimental.symbolic_shapes import (
@@ -1307,7 +1303,6 @@ def export(
 
     def inner(*args, **kwargs):
         combined_args = _combine_args(_f, args, kwargs)
-        _check_dynamic_shapes(combined_args, dynamic_shapes)
         constraints = _process_dynamic_shapes(combined_args, dynamic_shapes)
         f = _f
         assume_static_by_default = _assume_static_by_default
