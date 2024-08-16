@@ -2025,6 +2025,18 @@ def forward(self, p_linear_weight, p_linear_bias, b_buffer, x):
         ):
             export(M(), inputs, dynamic_shapes=dynamic_shapes)
 
+        dynamic_shapes = {
+            "x": {"k": {"k": [(dim,), True]}}
+        }  # mixing True and Dims is not well supported.
+        with self.assertRaisesRegex(
+            torch._dynamo.exc.UserError,
+            re.escape(
+                "Specifying both `True` and `Dim` or `DerivedDim` in `dynamic_shapes` is not well supported at the moment, "
+                "and can easily lead to constraint violation errors or obscure errors in torch.export."
+            ),
+        ):
+            export(M(), inputs, dynamic_shapes=dynamic_shapes)
+
         class N(torch.nn.Module):
             def forward(self, x):
                 return x["k"]["k1"][0] + x["k"]["k2"][0]
@@ -6859,9 +6871,7 @@ def forward(self, x, y):
             # this should specialize all
             SimpleEquality(),
             inputs,
-            specs=[
-                {"x": (None, True), "y": (True, True), "z": (True, None)}
-            ],
+            specs=[{"x": (None, True), "y": (True, True), "z": (True, None)}],
             passing_shapes=[
                 ((6, 3), (6, 3), (6, 3)),
             ],
