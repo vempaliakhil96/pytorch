@@ -1071,9 +1071,9 @@ def distribute_tensor_scale(mesh: DeviceMesh, op_schema: OpSchema) -> TupleStrat
     assert isinstance(found_inf, OpStrategy)
     assert isinstance(inv_scale, OpStrategy)
 
-    found_inv_input_placements: List[Placement] = []
-    found_inv_input_placements.append(Partial("max"))
-    found_inf.strategies[0].output_spec.placements = tuple(found_inv_input_placements)
+    found_inf_input_placements: List[Placement] = []
+    found_inf_input_placements.append(Partial("max"))
+    found_inf.strategies[0].output_spec.placements = tuple(found_inf_input_placements)
 
     output_tuple_strategy_childs: List[OpStrategy] = []
     for op_strategy in scaled_grad.childs:
