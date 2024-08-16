@@ -331,11 +331,6 @@ class TestFullyShardPostAccGradHookMultiProcess(FSDPTest):
 class TestFullyShardGradientScaler(FSDPTest):
     @skip_if_lt_x_gpu(2)
     def test_noninf_unscale_value(self):
-        class OptState(Enum):
-            READY = 0
-            UNSCALED = 1
-            STEPPED = 2
-
         torch.manual_seed(0)
         model = nn.Sequential(
             *[nn.Linear(4, 4, device="cuda", bias=False) for _ in range(2)]
