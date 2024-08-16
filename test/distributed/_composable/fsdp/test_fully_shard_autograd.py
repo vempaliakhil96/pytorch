@@ -5,7 +5,7 @@ import copy
 import functools
 import itertools
 import unittest
-from enum import Enum
+from torch.amp.grad_scaler import OptState
 from typing import Any, List, Optional, Type, Union
 
 import torch
@@ -330,7 +330,7 @@ class TestFullyShardPostAccGradHookMultiProcess(FSDPTest):
 
 class TestFullyShardGradientScaler(FSDPTest):
     @skip_if_lt_x_gpu(2)
-    def test_gradient_scaler(self):
+    def test_noninf_unscale_value(self):
         class OptState(Enum):
             READY = 0
             UNSCALED = 1

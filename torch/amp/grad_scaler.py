@@ -344,8 +344,8 @@ class GradScaler:
         inv_scale = self._scale.double().reciprocal().float()
         found_inf = torch.full((), 0.0, dtype=torch.float32, device=self._scale.device)
         if optimizer.param_groups[0]["params"] is not None:
-            for grad_tensor in optimizer.param_groups[0]["params"]:
-                found_inf = grad_tensor.new_full((), 0.0)
+            # if optimizer has params as DTensor, we initialize found_inf as DTensor by DTensor.new_full()
+            found_inf = optimizer.param_groups[0]["params"][0].new_full((), 0.0)
 
         optimizer_state["found_inf_per_device"] = self._unscale_grads_(
             optimizer, inv_scale, found_inf, False
