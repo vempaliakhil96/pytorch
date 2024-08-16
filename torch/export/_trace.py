@@ -548,7 +548,9 @@ def _export_to_torch_ir(
     kwargs = kwargs or {}
     combined_args = _combine_args(f, args, kwargs)
     _check_dynamic_shapes(combined_args, dynamic_shapes)
-    _dynamic_shapes = _transform_shapes_for_default_dynamic(combined_args, dynamic_shapes)
+    _dynamic_shapes = _transform_shapes_for_default_dynamic(
+        combined_args, dynamic_shapes
+    )
 
     with torch._dynamo.config.patch(dataclasses.asdict(DEFAULT_EXPORT_DYNAMO_CONFIG)):
         try:

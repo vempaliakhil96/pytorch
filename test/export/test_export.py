@@ -275,7 +275,9 @@ class TestExport(TestCase):
         #     exported_program.module()(*args, **reversed_kwargs), f(*args, **reversed_kwargs)
         # )
 
-    def _check_dynamic_shapes_specs_and_shapes(self, model, inputs, specs, passing_shapes, failing_shapes):
+    def _check_dynamic_shapes_specs_and_shapes(
+        self, model, inputs, specs, passing_shapes, failing_shapes
+    ):
         # exports with a list of equivalent dynamic shapes specs,
         # then tests for pass/fail on list of shapes
         for _specs in specs:
@@ -6799,7 +6801,6 @@ def forward(self, x, y):
             if node.op == "call_function":
                 self.assertTrue(False)
 
-
     def test_automatic_dynamic_shapes_simple_equality(self):
         # The next 3 test cases tests for automatic dynamic shapes specs, verifying that automatic dynamism
         # leads to replacement symbols being set for equalities, and inferred relationships being checked
@@ -6814,7 +6815,8 @@ def forward(self, x, y):
         inputs = tuple(torch.randn(6, 3) for _ in range(3))
         # fully dynamic
         self._check_dynamic_shapes_specs_and_shapes(
-            SimpleEquality(), inputs,
+            SimpleEquality(),
+            inputs,
             specs=[
                 True,
                 {"x": True, "y": True, "z": True},
@@ -6830,12 +6832,13 @@ def forward(self, x, y):
             failing_shapes=[
                 ((4, 4), (4, 4), (4, 3)),
                 ((4, 4), (5, 4), (4, 5)),
-            ]
+            ],
         )
         # static s1
         self._check_dynamic_shapes_specs_and_shapes(
             # specifying just one dimension as static should be enough to specialize all s1
-            SimpleEquality(), inputs,
+            SimpleEquality(),
+            inputs,
             specs=[
                 [True, True, (True, None)],
                 {"x": (True, True), "y": (True, True), "z": (True, None)},
@@ -6849,12 +6852,13 @@ def forward(self, x, y):
                 ((4, 4), (4, 4), (4, 4)),
                 ((1, 1), (1, 1), (1, 1)),
                 ((0, 9), (0, 9), (0, 9)),
-            ]
+            ],
         )
         # fully static
         self._check_dynamic_shapes_specs_and_shapes(
             # this should specialize all
-            SimpleEquality(), inputs,
+            SimpleEquality(),
+            inputs,
             specs=[
                 {"x": (None, True), "y": (True, True), "z": (True, None)}
             ],
@@ -6865,7 +6869,7 @@ def forward(self, x, y):
                 ((6, 4), (6, 4), (6, 4)),
                 ((1, 3), (1, 3), (1, 3)),
                 ((0, 9), (0, 9), (0, 9)),
-            ]
+            ],
         )
 
     def test_automatic_dynamic_shapes_constant_relation(self):
@@ -6877,7 +6881,8 @@ def forward(self, x, y):
         inputs = (torch.randn(6), torch.randn(10))
         # fully dynamic
         self._check_dynamic_shapes_specs_and_shapes(
-            OffBy4(), inputs,
+            OffBy4(),
+            inputs,
             specs=[
                 True,
                 {"x": (True,), "y": (True,)},
@@ -6889,11 +6894,12 @@ def forward(self, x, y):
             ],
             failing_shapes=[
                 ((10,), (13,)),
-            ]
+            ],
         )
         # static s1 should specialize s0
         self._check_dynamic_shapes_specs_and_shapes(
-            OffBy4(), inputs,
+            OffBy4(),
+            inputs,
             specs=[
                 {"x": (True,), "y": (None,)},
             ],
@@ -6919,7 +6925,8 @@ def forward(self, x, y):
 
         # fully dynamic
         self._check_dynamic_shapes_specs_and_shapes(
-            LinearRel(), inputs,
+            LinearRel(),
+            inputs,
             specs=[
                 True,
                 {"x": (True,), "y": (True,)},
@@ -6937,7 +6944,8 @@ def forward(self, x, y):
         )
         # static s1 shouldn't actually specialize s0 (guard: (s0 + 2) // 4 == 5)
         self._check_dynamic_shapes_specs_and_shapes(
-            LinearRel(), inputs,
+            LinearRel(),
+            inputs,
             specs=[
                 (True, None),
                 {"x": True, "y": None},
@@ -6954,7 +6962,8 @@ def forward(self, x, y):
         )
         # but static s0 will definitely specialize s1 (guard: (21 + 2) // 4 == s1 -> 5 == s1)
         self._check_dynamic_shapes_specs_and_shapes(
-            LinearRel(), inputs,
+            LinearRel(),
+            inputs,
             specs=[
                 (None, True),
             ],

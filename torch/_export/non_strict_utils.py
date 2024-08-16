@@ -127,7 +127,9 @@ def make_fake_inputs(
 
     combined_args = _combine_args(nn_module, args, kwargs)
     _check_dynamic_shapes(combined_args, dynamic_shapes)
-    _dynamic_shapes = _transform_shapes_for_default_dynamic(combined_args, dynamic_shapes)
+    _dynamic_shapes = _transform_shapes_for_default_dynamic(
+        combined_args, dynamic_shapes
+    )
     constraints = _process_dynamic_shapes(combined_args, _dynamic_shapes)
     t_constraints: Dict[int, Dict[int, Constraint]] = defaultdict(dict)
     for constraint in constraints:
@@ -310,8 +312,10 @@ def make_constraints(
     range_constraints = {
         symbol: inline_constraints[symbol] for symbol in inline_constraints
     }
-    if dynamic_shapes == True:
-        dynamic_shapes = _tree_map_with_path(lambda path, t, shape: None, combined_args, combined_args)
+    if dynamic_shapes is True:
+        dynamic_shapes = _tree_map_with_path(
+            lambda path, t, shape: None, combined_args, combined_args
+        )
     if not dynamic_shapes:
         return range_constraints
 
@@ -336,24 +340,25 @@ def make_constraints(
             continue
         shape_spec = flat_dynamic_shapes[input_index - num_lifted_inputs]
         for i, d in enumerate(node.meta["val"].shape):
-            if (
-                isinstance(d, torch.SymInt)
-                and not d.node.expr.is_number
-            ):
+            if isinstance(d, torch.SymInt) and not d.node.expr.is_number:
                 # Look up the range constraint for the symbol corresponding to this shape dimension
                 # and store it indexed by the symbolic expression corresponding to it.
                 # NOTE(avik): Use node._expr instead of node.expr for the lookup here because
                 # we want the symbol, not its replacement, which could be an expression. Maybe
                 # there's a better way to do this, e.g., by (re)computing value ranges for expressions?
-                dim = None if (shape_spec is None or shape_spec == True) else shape_spec[i]
-                if dim != True and dim:
-                    range_constraints[d.node.expr] = ValueRanges(
-                        lower=dim.min, upper=dim.max
-                    )
-                else:
+                dim = (
+                    None
+                    if (shape_spec is None or shape_spec is True)
+                    else shape_spec[i]
+                )
+                if dim is True or dim is None:
                     range_constraints[d.node.expr] = shape_env.var_to_range[
                         d.node._expr
                     ]
+                else:
+                    range_constraints[d.node.expr] = ValueRanges(
+                        lower=dim.min, upper=dim.max
+                    )
                 input_dims[d.node.expr].append(InputDim(input_name=node.name, dim=i))
                 free_symbols.update(d.node.expr.free_symbols)
 

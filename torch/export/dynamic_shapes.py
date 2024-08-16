@@ -933,7 +933,7 @@ def _transform_shapes_for_default_dynamic(
     into essentially what they'd look like for _dynamo.export().
 
     An example conversion might look like, for a 3-d input tensor:
-    
+
         input spec: {
             0: True,
             1: None,
@@ -970,14 +970,14 @@ def _transform_shapes_for_default_dynamic(
     elif dynamic_shapes is None or len(dynamic_shapes) == 0:  # create pytree structure of static dim
         dynamic_shapes = _tree_map_helper(combined_args, None)
     if isinstance(dynamic_shapes, (tuple, list)):
-        combined_args = type(dynamic_shapes)(combined_args.values())
-    
+        combined_args = type(dynamic_shapes)(combined_args.values())  # type: ignore[assignment, misc]
+
     def transform_shapes(path, tensor, shape):
         def _marked_dynamic(tensor, i):
             return i in getattr(tensor, "_dynamo_dynamic_indices", set())
 
         if isinstance(shape, dict):
-            out = {}
+            out: Dict[int, Union[_Dim, int]] = {}
             for i, val in enumerate(tensor.shape):
                 dim = shape.get(i, None)
                 if _marked_dynamic(tensor, i) or dim == True:
@@ -995,7 +995,7 @@ def _transform_shapes_for_default_dynamic(
                     assert dim is None
                     out[i] = val
         elif isinstance(shape, (tuple, list)):
-            out = []
+            out: List[Union[_Dim, int, None]] = []
             for i, val in enumerate(tensor.shape):
                 dim = shape[i]
                 if _marked_dynamic(tensor, i) or dim == True:
@@ -1010,13 +1010,17 @@ def _transform_shapes_for_default_dynamic(
             out = type(shape)(out)
         elif shape == True:
             out = None
-        elif shape is None and isinstance(tensor, torch.Tensor):
-            out = []
-            for i, val in enumerate(tensor.shape):
-                out.append(None if _marked_dynamic(tensor, i) else val)
-            out = out or None
+        else:
+            assert shape is None
+            if isinstance(tensor, torch.Tensor):
+                out: Union[List[Union[int, None]], None] = []
+                for i, val in enumerate(tensor.shape):
+                    out.append(None if _marked_dynamic(tensor, i) else val)
+                out = out or None
+            else:
+                out = None
         return out
-        
+
     def transform_shape(path, t, dynamic_shape):
         if isinstance(t, torch.Tensor):
             return transform_shapes(path, t, dynamic_shape)
