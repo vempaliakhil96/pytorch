@@ -1152,6 +1152,12 @@ class CppWrapperCpu(WrapperCodeGen):
         wrapper_body += """
                     input_handles = torch._C._aoti.unsafe_alloc_void_ptrs_from_tensors(input_tensors)
         """
+        # Release the inputs for memory reuse.
+        wrapper_body += """
+                    for inp in args:
+                        del inp
+                    args.clear()
+        """
 
         # unwrap output tensor back to python scalar
         if all(x for x in self.output_is_tensor.values()):
