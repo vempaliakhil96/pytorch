@@ -1495,7 +1495,7 @@ class CppWrapperCpu(WrapperCodeGen):
             'RECORD_FUNCTION("inductor_wrapper_call", c10::ArrayRef<c10::IValue>());'
         )
 
-    def write_triton_header_once(self):
+    def write_triton_header_once(self) -> None:
         pass
 
     def generate_start_graph(self):
