@@ -282,13 +282,12 @@ class GradScaler:
                         per_device_inv_scale.get(device),
                     )
                     if "DTensor" in grads[0].__class__.__name__:
-                        reduce_result = found_inf
                         # max_tensor is a DTensor here but not import here, add `hasattr` to avoid the
                         # lintruner error:  "Tensor" has no attribute "full_tensor"
                         max_tensor = per_device_found_inf.get(device).max()
                         if hasattr(max_tensor, "full_tensor"):
-                            reduce_result = max_tensor.full_tensor()
-                        per_device_found_inf = _MultiDeviceReplicator(reduce_result)
+                            found_inf = max_tensor.full_tensor()
+                        per_device_found_inf = _MultiDeviceReplicator(found_inf)
                         per_device_found_inf.get(device)
 
         return per_device_found_inf._per_device_tensors

@@ -46,7 +46,6 @@ class TestFullyShardGradientScaler(FSDPTest):
                         inital_grad[row_idx][col_idx].item() * inv_scale,
                     )
 
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=True)
         scaler.step(opt)
         scaler.update()
 
