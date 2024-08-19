@@ -808,6 +808,7 @@ def _check_dynamic_shapes(
     from torch._export.non_strict_utils import _flatten_dynamic_shapes
 
     if dynamic_shapes is True or dynamic_shapes is None or len(dynamic_shapes) == 0:
+        # no check needed
         return
     if isinstance(dynamic_shapes, (tuple, list)):
         combined_args = type(dynamic_shapes)(combined_args.values())  # type: ignore[assignment, misc]
@@ -980,7 +981,8 @@ def _transform_shapes_for_default_dynamic(
             children, context
         )  # unflatten into original type, or list if not built-in type
 
-    if dynamic_shapes is True:  # dynamic by default
+    if dynamic_shapes is True:
+        # dynamic by default, return None so no constraints are produced
         return None
     elif (
         dynamic_shapes is None or len(dynamic_shapes) == 0
@@ -1058,7 +1060,8 @@ def _process_dynamic_shapes(
     """
     from torch._dynamo.exc import UserError, UserErrorType
 
-    if dynamic_shapes is True or dynamic_shapes is None or len(dynamic_shapes) == 0:
+    if dynamic_shapes is None or len(dynamic_shapes) == 0:
+        # we run with dynamic by default, so no need to produce constraints
         return []
     if isinstance(dynamic_shapes, (tuple, list)):
         combined_args = type(dynamic_shapes)(combined_args.values())  # type: ignore[assignment, misc]
