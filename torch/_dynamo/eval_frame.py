@@ -1603,7 +1603,14 @@ def export(
 
         if same_signature:
             flat_args_dynamic_dims = [
-                {c.dim for c in (constraints or ()) if c.w_tensor() is x}
+                {
+                    c.dim
+                    for c in (constraints or ())
+                    if (
+                        c.w_tensor() is x
+                        and c.constraint_range.vr.lower != c.constraint_range.vr.upper
+                    )
+                }
                 for x in flat_args
             ]
             graph = rewrite_signature(
@@ -1618,14 +1625,6 @@ def export(
                 result_traced,  # type: ignore[possibly-undefined]
                 flat_args_dynamic_dims,
             )
-        # Store constraints and inputs as metadata for user passes, e.g. turn constraints to runtime check
-        assert graph is not None
-        graph.meta["input_shape_constraints"] = (
-            [constraint.serializable_spec for constraint in constraints]
-            if constraints
-            else []
-        )
-
         return ExportResult(graph, out_guards)
 
     if extra_args or extra_kwargs:

@@ -807,11 +807,7 @@ def _check_dynamic_shapes(
     from torch._dynamo.exc import UserError, UserErrorType
     from torch._export.non_strict_utils import _flatten_dynamic_shapes
 
-    if (
-        dynamic_shapes is True
-        or dynamic_shapes is None
-        or len(dynamic_shapes) == 0
-    ):
+    if dynamic_shapes is True or dynamic_shapes is None or len(dynamic_shapes) == 0:
         return
     if isinstance(dynamic_shapes, (tuple, list)):
         combined_args = type(dynamic_shapes)(combined_args.values())  # type: ignore[assignment, misc]
@@ -912,20 +908,19 @@ def _check_dynamic_shapes(
     # raise user warning if both True & Dims are specified in dynamic_shapes
     flat_dynamic_shapes = _flatten_dynamic_shapes(combined_args, dynamic_shapes)
     flatter_dynamic_shapes, _ = tree_flatten(flat_dynamic_shapes)
-    if (
-        any(isinstance(s, _Dim) for s in flatter_dynamic_shapes)
-        and any(s is True for s in flatter_dynamic_shapes)
+    if any(isinstance(s, _Dim) for s in flatter_dynamic_shapes) and any(
+        s is True for s in flatter_dynamic_shapes
     ):
         raise UserError(
             UserErrorType.INVALID_INPUT,
-                "Specifying both `True` and `Dim` or `DerivedDim` in `dynamic_shapes` is not well supported at the moment, " \
-                "and can easily lead to constraint violation errors or obscure errors in torch.export. " \
-                "Dim/DerivedDims expect all equal or related dimensions to be specified, and does not yet compose well with `True`. " \
-                "We suggest using `True` mixed with `None` for auto-dynamic + static shapes, plus torch._check(dim >= min), "
-                "torch._check(dim <= max) calls in your program to specify min/max ranges, or `Dim`/`DerivedDim` mixed with `None` " \
-                "if you want to assert on the exact specification of your program's dynamic shapes behavior.",
-                case_name="dynamic_shapes_validation",
-            )
+            "Specifying both `True` and `Dim` or `DerivedDim` in `dynamic_shapes` is not well supported at the moment, "
+            "and can easily lead to constraint violation errors or obscure errors in torch.export. Dim/DerivedDims "
+            "expect all equal or related dimensions to be specified, and does not yet compose well with `True`. "
+            "We suggest using `True` mixed with `None` for auto-dynamic + static shapes, plus torch._check(dim >= min), "
+            "torch._check(dim <= max) calls in your program to specify min/max ranges, or `Dim`/`DerivedDim` mixed with `None` "
+            "if you want to assert on the exact specification of your program's dynamic shapes behavior.",
+            case_name="dynamic_shapes_validation",
+        )
 
 
 def _transform_shapes_for_default_dynamic(
@@ -998,6 +993,7 @@ def _transform_shapes_for_default_dynamic(
         def _marked_dynamic(tensor, i):
             return i in getattr(tensor, "_dynamo_dynamic_indices", set())
 
+        out: Union[None, List[Any], Dict[int, Any]] = None
         if isinstance(shape, dict):
             out = {}
             for i, val in enumerate(tensor.shape):
@@ -1158,7 +1154,7 @@ def _process_dynamic_shapes(
 
     def update_symbols(path, tensor, shape):
         def _create_static_dim(tensor, i, value):
-            return _StaticDim(str(value), (int,), {"value": value})
+            return _StaticDim(f"{value}_{id(tensor)}_{i}", (int,), {"value": value})
 
         if isinstance(shape, dict):
             for i, dim in shape.items():

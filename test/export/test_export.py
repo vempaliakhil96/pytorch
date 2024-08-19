@@ -4295,45 +4295,6 @@ def forward(self, b_a_buffer, x):
                 len([node for node in gm.graph.nodes if node.op == "placeholder"]), 2
             )
 
-    @testing.expectedFailureSerDer  # We don't preserve metadata on graph module
-    def test_retrace_graph_level_meta_preservation(self):
-        class Foo(torch.nn.Module):
-            def __init__(self) -> None:
-                super().__init__()
-
-            def forward(self, x):
-                if x.shape[0] > 4:
-                    return x.cos()
-                return x.sin()
-
-        inp = torch.ones(7, 5)
-        dim0_x = torch.export.Dim("dim0_x", min=6)
-        exported = torch.export.export(Foo(), (inp,), dynamic_shapes={"x": {0: dim0_x}})
-        stateful_module = exported.module()
-        self.assertTrue(len(stateful_module.meta["input_shape_constraints"]), 2)
-
-        re_exported = export(stateful_module, (inp,), dynamic_shapes=({0: dim0_x},))
-        self.assertTrue(
-            len(re_exported.graph_module.meta["input_shape_constraints"]) == 2
-        )
-        self.assertTrue(
-            torch.allclose(
-                exported.module()(torch.ones(7, 5)),
-                re_exported.module()(torch.ones(7, 5)),
-            )
-        )
-
-        re_exported_v2 = export(exported.module(), (inp,))
-        self.assertTrue(
-            len(re_exported_v2.graph_module.meta["input_shape_constraints"]) == 2
-        )
-        self.assertTrue(
-            torch.allclose(
-                exported.module()(torch.ones(7, 5)),
-                re_exported_v2.module()(torch.ones(7, 5)),
-            )
-        )
-
     def test_check_is_size_error(self):
         class Module(torch.nn.Module):
             def forward(self, x):
@@ -4421,7 +4382,6 @@ def forward(self, b_a_buffer, x):
         ep = export(m, ())
         self.assertEqual(ep.graph_signature.lifted_tensor_constants, ["x"])
 
-    @unittest.expectedFailure
     def test_preserve_shape_dynamism_for_unused_inputs(self):
         @dataclass
         class Input:
