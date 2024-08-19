@@ -16,6 +16,7 @@ These backends include:
 - ``torch.backends.mps``
 - ``torch.backends.mkl``
 - ``torch.backends.mkldnn``
+- ``torch.backends.onednn``
 - ``torch.backends.nnpack``
 - ``torch.backends.openmp``
 - ``torch.backends.opt_einsum``
@@ -161,6 +162,14 @@ torch.backends.mkl
 
 .. autoclass::  torch.backends.mkl.verbose
 
+
+torch.backends.onednn
+^^^^^^^^^^^^^^^^^^^^^
+.. automodule:: torch.backends.onednn
+
+.. autofunction::  torch.backends.onednn.is_available
+
+.. autoclass::  torch.backends.onednn.verbose
 
 torch.backends.mkldnn
 ^^^^^^^^^^^^^^^^^^^^^
