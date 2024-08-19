@@ -9,7 +9,7 @@ from torch.testing._internal.common_utils import run_tests
 
 
 class TestFullyShardGradientScaler(FSDPTest):
-    @skip_if_lt_x_gpu(2)
+    #@skip_if_lt_x_gpu(2)
     def test_gradient_scaler_no_infs(self):
         torch.manual_seed(0)
         model = nn.Sequential(
@@ -37,7 +37,7 @@ class TestFullyShardGradientScaler(FSDPTest):
         )
         unscaled_grad = opt.param_groups[0]["params"][0].grad.to_local().clone()
         [row, col] = unscaled_grad.shape
-
+        torch.distributed.breakpoint()
         for row_idx in range(row):
             for col_idx in range(col):
                 if inital_grad[row_idx][col_idx].item() != float("inf"):
@@ -46,7 +46,6 @@ class TestFullyShardGradientScaler(FSDPTest):
                         inital_grad[row_idx][col_idx].item() * inv_scale,
                     )
 
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=True)
         scaler.step(opt)
         scaler.update()
 
