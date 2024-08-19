@@ -313,6 +313,7 @@ def make_constraints(
         symbol: inline_constraints[symbol] for symbol in inline_constraints
     }
     if dynamic_shapes is True:
+        # map to Nones, so we ignore what user specifies, and just read off of inferred value ranges.
         dynamic_shapes = _tree_map_with_path(
             lambda path, t, shape: None, combined_args, combined_args
         )
