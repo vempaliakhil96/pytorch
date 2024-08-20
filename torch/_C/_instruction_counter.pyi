@@ -1,0 +1,6 @@
+from torch.types import _int
+
+# Defined in torch/csrc/instruction_counter/Module.cpp
+
+def start() -> _int: ...
+def end(_int) -> _int: ...
