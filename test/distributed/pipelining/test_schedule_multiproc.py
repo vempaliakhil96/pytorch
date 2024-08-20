@@ -19,6 +19,7 @@ from torch.distributed.pipelining import (
     ScheduleFlexibleInterleaved1F1B,
     ScheduleGPipe,
     ScheduleInterleaved1F1B,
+    ScheduleInterleavedZeroBubble,
     ScheduleLoopedBFS,
 )
 from torch.distributed.pipelining.schedules import _PipelineScheduleRuntime
