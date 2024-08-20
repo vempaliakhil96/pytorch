@@ -3,7 +3,29 @@ from torch import _C
 from torch._C import _onnx as _C_onnx
 from torch._C._onnx import OperatorExportTypes, TensorProtoDataType, TrainingMode
 
-from . import (  # usort:skip. Keep the order instead of sorting lexicographically
+from ._exporter_states import ExportTypes
+from ._internal.onnxruntime import (
+    is_onnxrt_backend_supported,
+    OrtBackend as _OrtBackend,
+    OrtBackendOptions as _OrtBackendOptions,
+    OrtExecutionProvider as _OrtExecutionProvider,
+)
+from ._type_utils import JitScalarType
+from .errors import CheckerError  # Backwards compatibility
+from .utils import (
+    _optimize_graph,
+    _run_symbolic_function,
+    _run_symbolic_method,
+    export,
+    export_to_pretty_string,
+    is_in_onnx_export,
+    register_custom_op_symbolic,
+    select_model_mode_for_export,
+    unregister_custom_op_symbolic,
+)
+
+
+from . import (  # usort: skip. Keep the order instead of sorting lexicographically
     _deprecation,
     errors,
     symbolic_caffe2,
@@ -25,23 +47,8 @@ from . import (  # usort:skip. Keep the order instead of sorting lexicographical
     utils,
 )
 
-# TODO(After 1.13 release): Remove the deprecated SymbolicContext
-from ._exporter_states import ExportTypes, SymbolicContext
-from ._type_utils import JitScalarType
-from .errors import CheckerError  # Backwards compatibility
-from .utils import (
-    _optimize_graph,
-    _run_symbolic_function,
-    _run_symbolic_method,
-    export,
-    export_to_pretty_string,
-    is_in_onnx_export,
-    register_custom_op_symbolic,
-    select_model_mode_for_export,
-    unregister_custom_op_symbolic,
-)
 
-from ._internal.exporter import (  # usort:skip. needs to be last to avoid circular import
+from ._internal._exporter_legacy import (  # usort: skip. needs to be last to avoid circular import
     DiagnosticOptions,
     ExportOptions,
     ONNXProgram,
@@ -54,12 +61,6 @@ from ._internal.exporter import (  # usort:skip. needs to be last to avoid circu
     enable_fake_mode,
 )
 
-from ._internal.onnxruntime import (
-    is_onnxrt_backend_supported,
-    OrtBackend as _OrtBackend,
-    OrtBackendOptions as _OrtBackendOptions,
-    OrtExecutionProvider as _OrtExecutionProvider,
-)
 
 __all__ = [
     # Modules
@@ -134,13 +135,6 @@ _OrtBackend.__module__ = "torch.onnx"
 
 producer_name = "pytorch"
 producer_version = _C_onnx.PRODUCER_VERSION
-
-
-@_deprecation.deprecated(
-    since="1.12.0", removed_in="2.0", instructions="use `torch.onnx.export` instead"
-)
-def _export(*args, **kwargs):
-    return utils._export(*args, **kwargs)
 
 
 # TODO(justinchuby): Deprecate these logging functions in favor of the new diagnostic module.

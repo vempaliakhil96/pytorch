@@ -567,8 +567,6 @@ class _FileSystemWriter(StorageWriter):
             while True:
                 res += result_queue.get_nowait()
         except queue.Empty:
-            pass
-
             fut: Future[List[WriteResult]] = Future()
             fut.set_result(res)
             return fut
@@ -654,7 +652,11 @@ class FileSystemReader(StorageReader):
                     else:
                         tensor = cast(
                             Tensor,
-                            torch.load(cast(IO[bytes], file_slice), map_location="cpu"),
+                            torch.load(
+                                cast(IO[bytes], file_slice),
+                                map_location="cpu",
+                                weights_only=True,
+                            ),
                         )
                         tensor = narrow_tensor_by_index(
                             tensor, req.storage_offsets, req.lengths
