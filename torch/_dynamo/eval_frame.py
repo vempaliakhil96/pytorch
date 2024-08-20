@@ -1564,18 +1564,14 @@ def export(
 
         if same_signature:
             flat_args_dynamic_dims = [
-<<<<<<< HEAD
                 {
                     c.dim
                     for c in (constraints or ())
                     if (
-                        c.w_tensor() is x
+                        c.t_id == id(x)
                         and c.constraint_range.vr.lower != c.constraint_range.vr.upper
                     )
                 }
-=======
-                {c.dim for c in (constraints or ()) if c.t_id == id(x)}
->>>>>>> fbf3fc2a306bae2acef642ceb82ea827a6e700df
                 for x in flat_args
             ]
             graph = rewrite_signature(
