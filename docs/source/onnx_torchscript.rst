@@ -697,23 +697,5 @@ Functions
 ^^^^^^^^^
 
 .. autofunction:: export
-.. autofunction:: export_to_pretty_string
 .. autofunction:: register_custom_op_symbolic
 .. autofunction:: unregister_custom_op_symbolic
-.. autofunction:: select_model_mode_for_export
-.. autofunction:: is_in_onnx_export
-.. autofunction:: enable_log
-.. autofunction:: disable_log
-.. autofunction:: torch.onnx.verification.find_mismatch
-
-Classes
-^^^^^^^
-
-.. autosummary::
-    :toctree: generated
-    :nosignatures:
-    :template: classtemplate.rst
-
-    JitScalarType
-    torch.onnx.verification.GraphInfo
-    torch.onnx.verification.VerificationOptions
