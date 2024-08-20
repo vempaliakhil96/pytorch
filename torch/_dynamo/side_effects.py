@@ -26,6 +26,10 @@ from .variables.base import (
 )
 
 
+# Defined in CPython's Include/object.h
+TPFLAGS_IMMUTABLETYPE = 1 << 8
+
+
 class MutableSideEffects(MutableLocalBase):
     """
     VariableTracker.mutable_local marker to indicate a list passed as
@@ -193,7 +197,7 @@ class SideEffects:
         return (
             inspect.getattr_static(cls, "__getattribute__", None)
             is object.__getattribute__
-        )
+        ) or bool(inspect.getattr_static(cls, "__flags__", 0) & TPFLAGS_IMMUTABLETYPE)
 
     def is_attribute_mutation(self, item):
         return isinstance(item.mutable_local, AttributeMutation)
