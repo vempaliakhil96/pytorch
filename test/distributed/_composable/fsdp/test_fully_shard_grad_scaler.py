@@ -52,20 +52,25 @@ class TestFullyShardGradientScaler(FSDPTest):
         unscaled_grad = opt.param_groups[0]["params"][0].grad.to_local().clone()
         self.assertEqual(unscaled_grad, inital_grad * inv_scale)
         initial_scale = scaler.get_scale()
+        initial_state = len(opt.state.items())
 
         scaler.step(opt)
-        steped_results = opt.state.items()
-        if not has_inf:
-            self.assertTrue(len(steped_results) > 0)
+        steped_state = len(opt.state.items())
+        if has_inf:
+            # assert parameters are the same before/after
+            self.assertEqual(steped_state, initial_state)
         else:
-            self.assertEqual(len(steped_results), 0)
+            # new parameters here if no inf found during .unscale_()
+            self.assertTrue(steped_state > initial_state)
 
         scaler.update()
         updated_scale = scaler.get_scale()
         if has_inf:
+            # assert scale is udpated
             backoff_factor = scaler.get_backoff_factor()
             self.assertEqual(updated_scale, initial_scale * backoff_factor)
         else:
+            # scale is not udpated
             self.assertEqual(updated_scale, initial_scale)
 
 
