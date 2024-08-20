@@ -561,9 +561,10 @@ class TestDeviceMeshGetItem(DTensorTestBase):
         # Check on the current dp_local_rank, whether the cp mesh tensor is the same.
         self.assertEqual(dp_cp_mesh.mesh[dp_local_rank], cp_mesh.mesh)
 
+        mesh_dim_names = ("cp", "dp")
         with self.assertRaisesRegex(
             KeyError,
-            "Valid mesh_dim_names should be a subsequence of",
+            "Invalid slice",
         ):
             cp_dp_mesh = mesh_3d["cp", "dp"]
 
@@ -604,6 +605,34 @@ class TestDeviceMeshGetItem(DTensorTestBase):
             "dp_tp"
         ]
         self.assertEqual(flatten_mesh_root_dims, (0, 2))
+
+    @with_comms
+    def test_reconstruct_mesh_with_flatten_dim(self):
+        mesh_3d = init_device_mesh(
+            self.device_type, (2, 2, 2), mesh_dim_names=("replicate", "shard", "cp")
+        )
+        shard_cp_mesh = mesh_3d["shard", "cp"]._flatten()
+        hsdp_mesh = mesh_3d["replicate", "shard_cp"]
+        expected_mesh_tensor = torch.tensor(
+            [[0, 1, 2, 3], [4, 5, 6, 7]], dtype=torch.int
+        )
+        self.assertEqual(hsdp_mesh.mesh, expected_mesh_tensor)
+        self.assertEqual(shard_cp_mesh.get_group(), mesh_3d["shard_cp"].get_group())
+        self.assertEqual(
+            shard_cp_mesh.get_group(), mesh_3d.get_group(mesh_dim="shard_cp")
+        )
+
+        mesh_3d = init_device_mesh(
+            self.device_type, (2, 2, 2), mesh_dim_names=("dp", "cp", "tp")
+        )
+        dp_cp_mesh = mesh_3d["dp", "cp"]._flatten()
+        spmd_mesh = mesh_3d["dp_cp", "tp"]
+        expected_mesh_tensor = torch.tensor(
+            [[0, 1], [2, 3], [4, 5], [6, 7]], dtype=torch.int
+        )
+        self.assertEqual(spmd_mesh.mesh, expected_mesh_tensor)
+        self.assertEqual(dp_cp_mesh.get_group(), mesh_3d["dp_cp"].get_group())
+        self.assertEqual(dp_cp_mesh.get_group(), mesh_3d.get_group(mesh_dim="dp_cp"))
 
 
 class TestMeshEnv(DTensorTestBase):
