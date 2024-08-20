@@ -16,7 +16,6 @@ class TestFullyShardGradientScaler(FSDPTest):
             self._test_gradient_scaler,
         )
 
-    @skip_if_lt_x_gpu(2)
     def _test_gradient_scaler(self, has_inf: bool):
         torch.manual_seed(0)
         model = nn.Sequential(
