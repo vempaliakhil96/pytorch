@@ -528,7 +528,7 @@ std::optional<Tensor> convert_boolean_attn_mask(const std::optional<Tensor>& att
   // to mask *out*.
   if (attn_mask->dtype() == at::kBool) {
     // TODO Use the max type of the input and output
-    return at::where(attn_mask->logical_not(), -200000.0/*std::numeric_limits<double>::infinity()*/, at::scalar_tensor(0.0, at::TensorOptions().dtype(dtype)));
+    return at::where(attn_mask->logical_not(), -200000.0, at::scalar_tensor(0.0, at::TensorOptions().dtype(dtype)));
   }
   // Otherwise, attn_mask represents an additive attention tensor
   return attn_mask;
@@ -679,7 +679,7 @@ Tensor scaled_dot_product_attention(
           query_, key, value, attn_mask, compute_logsumexp, dropout_p, is_causal, false /*return_debug_mask*/, scale);
       return std::get<0>(out_lse_softmax);
     }
-    case sdp::SDPBackend::flash_attention: { 
+    case sdp::SDPBackend::flash_attention: {
       std::optional<Tensor> attn_mask = convert_boolean_attn_mask(attn_mask_, query_.dtype());
       if(query_.device().type() == DeviceType::CUDA){
         c10::SymInt og_size = query_.sym_size(-1);
@@ -696,7 +696,7 @@ Tensor scaled_dot_product_attention(
       return std::get<0>(at::_scaled_dot_product_flash_attention_for_cpu(
           query_, key, value, dropout_p, is_causal, attn_mask, scale));
     }
-    case sdp::SDPBackend::efficient_attention: { 
+    case sdp::SDPBackend::efficient_attention: {
       std::optional<Tensor> attn_mask = convert_boolean_attn_mask(attn_mask_, query_.dtype());
       bool compute_logsumexp = should_compute_logsumexp(query_, key, value);
       if (attn_mask.has_value()) {
@@ -706,7 +706,7 @@ Tensor scaled_dot_product_attention(
           query_, key, value, attn_mask, compute_logsumexp, dropout_p, is_causal, scale);
       return std::get<0>(out_and_lse);
     }
-    case sdp::SDPBackend::overrideable: { 
+    case sdp::SDPBackend::overrideable: {
       std::optional<Tensor> attn_mask = convert_boolean_attn_mask(attn_mask_, query_.dtype());
       auto out_lse_softmax = at::_scaled_dot_product_fused_attention_overrideable(
           query_, key, value, attn_mask, dropout_p, is_causal, false /*return_debug_mask*/, scale);
