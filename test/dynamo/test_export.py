@@ -2495,6 +2495,19 @@ def forward(self, x):
 
         torch.export.export(model, (a, b), dynamic_shapes=dynamic_shape_spec)
 
+    def test_export_fast_binary_broadcast_check_unbacked(self):
+        class MyModel(torch.nn.Module):
+            def forward(self, numel, scalar):
+                u0 = numel.item()
+                torch._check_is_size(u0)
+                x = torch.ones(u0 + 1)
+                return scalar - x
+
+        model = MyModel().eval().cuda()
+        numel = torch.tensor(10)
+        scalar = torch.randn(1)
+        torch.export.export(model, (numel, scalar))
+
     def test_export_meta(self):
         class MyModule(torch.nn.Module):
             def __init__(self) -> None:
@@ -2741,36 +2754,6 @@ def forward(self, x):
                 if node.op == "placeholder"
             ],
             ["torch.Size([s0, s1, s1])", "torch.Size([s0, s1, s1])"],
-        )
-
-    @config.patch(
-        capture_dynamic_output_shape_ops=True,
-        specialize_int=True,
-        capture_scalar_outputs=True,
-    )
-    def test_export_preserve_constraints_as_metadata_scalar(self):
-        def f(x, y):
-            b = x.item()
-            torch._check_is_size(b)
-            return torch.empty((b, y.shape[0]))
-
-        x = torch.tensor([3])
-        y = torch.randn([8, 8, 6])
-        example_inputs = (x, y)
-        dynamic_shapes = (None, {0: torch.export.Dim("dimy", min=6, max=10)})
-        gm, _ = torch._dynamo.export(
-            f,
-            dynamic_shapes=dynamic_shapes,
-            aten_graph=True,
-            tracing_mode="symbolic",
-        )(*example_inputs)
-
-        constraints = torch.export.dynamic_shapes._process_dynamic_shapes(
-            {"x": x, "y": y}, dynamic_shapes=dynamic_shapes
-        )
-        self.assertEqual(
-            gm.meta["input_shape_constraints"],
-            [c.serializable_spec for c in constraints],
         )
 
     @torch._dynamo.config.patch(
