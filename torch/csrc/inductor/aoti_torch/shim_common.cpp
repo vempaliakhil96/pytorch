@@ -10,9 +10,22 @@
 #include <torch/csrc/inductor/aoti_torch/tensor_converter.h>
 #include <torch/csrc/inductor/aoti_torch/utils.h>
 #include <torch/csrc/inductor/inductor_ops.h>
+#include <torch/serialize.h>
+#include <torch/csrc/jit/serialization/pickle.h>
 #include <cstdint>
 #include <cstdio>
+#include <fstream>
 #include <iostream>
+#include <memory>
+
+// TODO: Investigate why this is necessary, but fixes build problems in CI
+#if __has_include("filesystem")
+#include <filesystem>
+namespace fs = std::filesystem;
+#else
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#endif
 
 #ifndef AT_PER_OPERATOR_HEADERS
 #include <ATen/Functions.h>
@@ -44,6 +57,7 @@
 #endif
 
 using namespace torch::aot_inductor;
+using namespace torch::serialize;
 
 namespace {
 static c10::Device c10_device(int32_t device_type, int32_t device_index) {
@@ -934,15 +948,34 @@ AOTI_TORCH_EXPORT AOTITorchError aoti_torch_view_dtype(
 
 AOTI_TORCH_EXPORT void aoti_torch_print_tensor_handle(
     AtenTensorHandle self,
-    const char* msg) {
+    const char* tensor_name,
+    const char* launch_prefix,
+    const char* kernel_name) {
   at::Tensor* t = tensor_handle_to_tensor_pointer(self);
 
   auto device = t->device();
 
+  // Save tensor to tmp .pt file for tensors and can be torch.load'ed later
+  std::string cwd = fs::current_path().string();
+  std::string tmp_folder = cwd + "/tmp/aoti_torch/";
+  if (!fs::exists(tmp_folder)) {
+    std::cout << "Path does not exist, creating it..." << tmp_folder
+              << std::endl;
+    fs::create_directories(tmp_folder);
+  }
+  std::string tensor_filepath_to_save = tmp_folder + launch_prefix + "_" +
+      kernel_name + "_" + tensor_name + "_" + device.str() + ".pt";
+
+  auto bytes = torch::jit::pickle_save(c10::IValue(*t));
+  std::ofstream fout(tensor_filepath_to_save, std::ios::out | std::ios::binary);
+  fout.write(bytes.data(), bytes.size());
+  fout.close();
+
   // Display message
   std::cout << "[";
-  if (msg) {
-    std::cout << "  " << msg;
+  if (launch_prefix && kernel_name) {
+    std::cout << "  " << launch_prefix << " - " << kernel_name << " - "
+              << tensor_name;
   }
   std::cout << "  "
             << "]:" << std::endl;
