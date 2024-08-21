@@ -29,6 +29,13 @@ Context& globalContext() {
   return globalContext_;
 }
 
+struct ContextInitializer {
+  ContextInitializer() { globalContext(); }
+};
+
+static ContextInitializer contextInitializer;
+}
+
 // NB: This method is *purely* whether or not a user requested
 // that CuDNN was enabled, it doesn't actually say anything about
 // whether or not CuDNN is actually usable.
