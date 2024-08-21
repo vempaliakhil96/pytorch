@@ -1,6 +1,8 @@
 #ifndef C10_UTIL_LOGGING_IS_NOT_GOOGLE_GLOG_H_
 #define C10_UTIL_LOGGING_IS_NOT_GOOGLE_GLOG_H_
 
+#ifndef FBCODE_CAFFE2
+
 #include <chrono>
 #include <climits>
 #include <ctime>
@@ -255,4 +257,5 @@ inline void PrintSequence(std::ostream& out, Iter begin, Iter end) {
 }
 } // namespace c10
 
+#endif
 #endif // C10_UTIL_LOGGING_IS_NOT_GOOGLE_GLOG_H_
