@@ -566,19 +566,34 @@ class TorchInGraphFunctionVariable(BaseTorchVariable):
             if dim is not None:
                 return self.call_method(tx, "stride", [dim], {})
 
-        @register(torch.addcdiv)
-        def handle_addcdiv(self, tx: "InstructionTranslator", *args, **kwargs):
-            if len(args) == 3 and "value" in kwargs and len(kwargs) == 1:
-                # decompose addcdiv into constituent ops, prevents a graph break due to converting
-                # value to a scalar
-                result = TorchInGraphFunctionVariable(torch.div).call_function(
-                    tx, [*args[1:]], {}
+        @register(torch._foreach_lerp_)
+        def handle_inplace_foreach_lerp_scalar(
+            self, tx: "InstructionTranslator", *args, **kwargs
+        ):
+            if len(args) == 3 and not isinstance(args[2], ListVariable) and not kwargs:
+                # decompose foreach lerp into constituent ops, prevents a graph break due to
+                # converting a value to a scalar when arg[2] is a single tensor
+                result = TorchInGraphFunctionVariable(torch._foreach_sub).call_function(
+                    tx, [args[1], args[0]], {}
                 )
-                result = TorchInGraphFunctionVariable(torch.mul).call_function(
-                    tx, [result, kwargs["value"]], {}
+                result = TorchInGraphFunctionVariable(torch._foreach_mul).call_function(
+                    tx, [result, args[2]], {}
                 )
-                return TorchInGraphFunctionVariable(torch.add).call_function(
+                return TorchInGraphFunctionVariable(torch._foreach_add_).call_function(
                     tx, [args[0], result], {}
+                )
+
+        @register(torch._foreach_pow)
+        def handle_foreach_pow_scalar(
+            self, tx: "InstructionTranslator", *args, **kwargs
+        ):
+            # In eager it's more performant to call item() from within the C op implementation
+            # in compile, it's more performant to not graph break.
+            if len(args) == 2 and isinstance(args[0], TensorVariable) and not kwargs:
+                scalar_device = args[0].device
+                broadcast_arg_0 = ListVariable([args[0] for _ in args[1].items])
+                return TorchInGraphFunctionVariable(torch._foreach_pow).call_function(
+                    tx, [broadcast_arg_0, args[1]], {}
                 )
 
         @register(torch._assert)

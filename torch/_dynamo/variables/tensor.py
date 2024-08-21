@@ -860,7 +860,7 @@ class TensorVariable(VariableTracker):
 
         tx = InstructionTranslator.current_tx()
         if value is not None:
-            result = variables.TorchInGraphFunctionVariable(torch.div).call_function(
+            result = variables.TorchInGraphFunctionVariable(torch.mul).call_function(
                 tx, [tensor1, tensor2], {}
             )
             result = variables.TorchInGraphFunctionVariable(torch.mul).call_function(
