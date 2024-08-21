@@ -868,6 +868,19 @@ class TensorVariable(VariableTracker):
             )
             return self.call_method(tx, "add_", [result], {})
 
+    def method_addcmul_(self, tensor1, tensor2, *, value=None):
+        from ..symbolic_convert import InstructionTranslator
+
+        tx = InstructionTranslator.current_tx()
+        if value is not None:
+            result = variables.TorchInGraphFunctionVariable(torch.mul).call_function(
+                tx, [tensor1, tensor2], {}
+            )
+            result = variables.TorchInGraphFunctionVariable(torch.mul).call_function(
+                tx, [result, value], {}
+            )
+            return self.call_method(tx, "add_", [result], {})
+
     def method___contains__(self, arg):
         from ..symbolic_convert import InstructionTranslator
 
