@@ -1,6 +1,8 @@
 name: inductor-perf-nightly-aarch64
 
 on:
+  #TODO: Remove before landing
+  pull_request:
   schedule:
     # - cron: 0 7 * * 1-6
     # - cron: 0 7 * * 0
