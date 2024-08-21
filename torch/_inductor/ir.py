@@ -6686,6 +6686,7 @@ class LoopBody:
 
     def __init__(self, fn, args, var_ranges):
         super().__init__()
+        self.args = args
         self.var_ranges = var_ranges
         self.indexing_exprs = {}
         self.indexing_exprs_name = {}

@@ -821,11 +821,21 @@ class SchedulerNode(BaseSchedulerNode):
     def _compute_attrs(
         self,
         extra_indexing_constraints: Optional[Tuple[Dict[Any, Any], List[Any]]] = None,
+        extra_size_and_var_constraints: Optional[
+            Tuple[Tuple[Any, ...], List[Any]]
+        ] = None,
     ) -> None:
-        assert isinstance(self.node, (ir.ComputedBuffer, ir.TemplateBuffer))
-        self._sizes, self._body = self.node.simplify_and_reorder(
-            extra_indexing_constraints=extra_indexing_constraints
-        )
+        if extra_size_and_var_constraints:
+            assert isinstance(self.node, (ir.ComputedBuffer))
+            self._sizes, new_vars = extra_size_and_var_constraints
+            _, body, _ = self.node.get_default_sizes_body()
+            _, var_ranges = dependencies.index_vars_no_squeeze(*self._sizes, prefix="z")
+            self._body = ir.LoopBody(body, new_vars, var_ranges)
+        else:
+            assert isinstance(self.node, (ir.ComputedBuffer, ir.TemplateBuffer))
+            self._sizes, self._body = self.node.simplify_and_reorder(
+                extra_indexing_constraints=extra_indexing_constraints
+            )
 
         group_fn = self.scheduler.get_backend(self.node.get_device()).group_fn
         self.group = (self.node.get_device(), group_fn(self._sizes))
@@ -840,9 +850,16 @@ class SchedulerNode(BaseSchedulerNode):
             )
 
     def recompute_size_and_body(
-        self, extra_indexing_constraints: Tuple[Dict[Any, Any], List[Any]]
+        self,
+        extra_indexing_constraints: Optional[Tuple[Dict[Any, Any], List[Any]]] = None,
+        extra_size_and_var_constraints: Optional[
+            Tuple[Tuple[Any, ...], List[Any]]
+        ] = None,
     ) -> None:
-        self._compute_attrs(extra_indexing_constraints=extra_indexing_constraints)
+        self._compute_attrs(
+            extra_indexing_constraints=extra_indexing_constraints,
+            extra_size_and_var_constraints=extra_size_and_var_constraints,
+        )
 
     def debug_str_extra(self) -> str:
         name = self.get_name()

@@ -4019,6 +4019,104 @@ class CppScheduling(BaseScheduling):
             self._can_fuse_horizontal_impl(node1, node2) and not node1.is_reduction()
         ) or self.can_fuse_vertical_outer_loop(node1, node2)
 
+    def optimize_loop_order(self, nodes):
+        """
+        Apply loop split optimization.
+        When one of the indexing_exprs contains a division, we eliminate the division by splitting the loop
+        to avoid non-contiguous loads, subject to the following conditions:
+            1. No reduction and no mudular index for all nodes.
+            2. Only one node's one indexing_exprs contains a division, according to this indexing_exprs,
+               we can get the dimension that needs to be split, and the split dimension is contiguous
+               in all other indexing_exprs.
+
+        For example, if the node's var_ranges: {z0: 2, z1: 9216, z2: 960} and indexing_exprs:
+        {'index0': 8847360*z0 + 960*z1 + z2, 'index1': 32*z0 + (z2//30), 'index2': z2},
+        we will spilt z2 -> 30*z2 + z3, then the node's var_ranges will be changed to
+        {z0: 2, z1: 9216, z2: 32, z3: 30} and indexing_exprs will be changed to
+        {'index0': 8847360*z0 + 960*z1 + 30*z2 + z3, 'index1': 32*z0 + z2, 'index2': 30*z2 + z3}.
+        """
+        # No reduction and no mudular
+        if any(
+            len(node.group[1][1]) != 0
+            or any(
+                expr.has(ModularIndexing) for expr in node._body.indexing_exprs.values()
+            )
+            for node in nodes
+        ):
+            return nodes
+
+        split_var = None
+        split_number = None
+        divide_index_name = None
+
+        def has_one_div(node):
+            num_div = 0
+            expr_matched = False
+            for name, expr in node._body.indexing_exprs.items():
+                num_div += expr.count(FloorDiv)
+                if expr.count(FloorDiv) == 1:
+                    nonlocal split_var
+                    nonlocal split_number
+                    nonlocal divide_index_name
+                    div_expr = expr.find(FloorDiv).pop()
+                    split_var = div_expr.args[0]
+                    split_number = div_expr.args[1]
+                    divide_index_name = name
+                    expr_matched = (
+                        isinstance(split_number, sympy.core.numbers.Integer)
+                        and isinstance(split_var, sympy.core.symbol.Symbol)
+                        and divide_index_name is not None
+                    )
+
+            return num_div == 1 and expr_matched
+
+        # Only one node contains a division, and the split dimension is contiguous in all other indexing_exprs.
+        nodes_have_div = [node for node in nodes if has_one_div(node)]
+        if len(nodes_have_div) != 1 or any(
+            stride_at_vec_range(
+                expr, split_var, cpu_vec_isa.pick_vec_isa().nelements(torch.float32)
+            )
+            != 1
+            for name, expr in nodes_have_div[0]._body.indexing_exprs.items()
+            if name != divide_index_name
+        ):
+            return nodes
+
+        for node in nodes:
+            iter_ranges = [*node._body.var_ranges.values()]
+            iter_vars = [*node._body.var_ranges.keys()]
+            split_idx = iter_vars.index(split_var)
+            assert split_idx < len(iter_vars)
+            new_iter_ranges: Tuple[sympy.Expr, ...] = ()
+            for idx in range(len(iter_ranges)):
+                if idx != split_idx:
+                    new_iter_ranges += (iter_ranges[idx],)
+                else:
+                    val_to_split = iter_ranges[idx]
+                    new_iter_ranges += (val_to_split // split_number, split_number)
+            new_reduce_ranges: Tuple[sympy.Expr, ...] = ()
+
+            new_index = sympy.core.symbol.Symbol(
+                "z" + str(len([*node._body.var_ranges.values()])),
+                integer=True,
+                nonnegative=True,
+            )
+            replacements = {split_var: split_var * split_number + new_index}  # type: ignore[operator]
+            new_vars = [
+                [sympy_subs(expr, replacements) for expr in node._body.args[0]],
+                [],
+            ]
+
+            # Here decide the final loop order
+            node.recompute_size_and_body(
+                extra_size_and_var_constraints=(
+                    (new_iter_ranges, new_reduce_ranges),
+                    new_vars,
+                )
+            )
+
+        return nodes
+
     def codegen_outer_loop_node(
         self,
         node: OuterLoopFusedSchedulerNode,
@@ -4221,6 +4319,7 @@ class CppScheduling(BaseScheduling):
             self.codegen_outer_loop_node(node)
         else:
             nodes: List[SchedulerNode] = node.get_nodes()  # type: ignore[assignment]
+            nodes = self.optimize_loop_order(nodes)
             cpp_kernel_proxy = CppKernelProxy(kernel_group)
             cpp_kernel_proxy.codegen_nodes(nodes)
             kernel_group.finalize_kernel(cpp_kernel_proxy, nodes)
