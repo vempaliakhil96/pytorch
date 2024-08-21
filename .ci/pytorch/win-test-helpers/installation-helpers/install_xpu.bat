@@ -1,4 +1,4 @@
-REM Description: Install Intel oneAPI Pytorch Bundle on Windows
+REM Description: Install Intel Support Packages on Windows
 REM BKM reference: https://www.intel.com/content/www/us/en/developer/articles/tool/pytorch-prerequisites-for-intel-gpu/2-5.html
 
 set ONEAPI_PARENT_DIR=C:\Program Files (x86)\Intel
