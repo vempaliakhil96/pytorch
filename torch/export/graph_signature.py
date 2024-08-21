@@ -3,6 +3,7 @@ import dataclasses
 from enum import auto, Enum
 from typing import Collection, Dict, List, Mapping, Optional, Set, Union
 
+import torch
 from torch._functorch._aot_autograd.schemas import GraphSignature
 from torch._library.fake_class_registry import FakeScriptObject
 from torch.utils import _pytree as pytree
