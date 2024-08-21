@@ -40,7 +40,10 @@ from torch._export.passes.lift_constants_pass import (
 from torch._export.utils import placeholder_naming_pass, placeholder_prefixes
 from torch._export.verifier import SpecViolationError
 from torch._export.wrappers import _wrap_submodules
-from torch._functorch._aot_autograd.input_output_analysis import _graph_input_names, _graph_output_names
+from torch._functorch._aot_autograd.input_output_analysis import (
+    _graph_input_names,
+    _graph_output_names,
+)
 from torch._functorch._aot_autograd.traced_function_transforms import (
     create_functional_call,
 )
@@ -74,10 +77,7 @@ from .exported_program import (
     ModuleCallEntry,
     ModuleCallSignature,
 )
-from .graph_signature import (
-    _convert_to_export_graph_signature,
-    ExportGraphSignature,
-)
+from .graph_signature import _convert_to_export_graph_signature, ExportGraphSignature
 
 
 log = logging.getLogger(__name__)
@@ -1482,7 +1482,9 @@ def _export_to_aten_ir_make_fx(
             user_inputs=input_names[params_len:],
             user_outputs=output_names,
             inputs_to_parameters=dict(zip(input_names[0:param_len], named_parameters)),
-            inputs_to_buffers=dict(zip(input_names[param_len : param_len + buffer_len], named_buffers)),
+            inputs_to_buffers=dict(
+                zip(input_names[param_len : param_len + buffer_len], named_buffers)
+            ),
             buffers_to_mutate={},
             user_inputs_to_mutate={},
             in_spec=in_spec,
@@ -1646,15 +1648,11 @@ def _non_strict_export(
 
             sig.parameters = pytree.tree_map(_strip_root, sig.parameters)
             sig.buffers = pytree.tree_map(_strip_root, sig.buffers)
-            sig.inputs_to_buffers = pytree.tree_map(
-                _strip_root, sig.inputs_to_buffers
-            )
+            sig.inputs_to_buffers = pytree.tree_map(_strip_root, sig.inputs_to_buffers)
             sig.inputs_to_parameters = pytree.tree_map(
                 _strip_root, sig.inputs_to_parameters
             )
-            sig.buffers_to_mutate = pytree.tree_map(
-                _strip_root, sig.buffers_to_mutate
-            )
+            sig.buffers_to_mutate = pytree.tree_map(_strip_root, sig.buffers_to_mutate)
 
             for node in gm.graph.nodes:
                 if "nn_module_stack" in node.meta:

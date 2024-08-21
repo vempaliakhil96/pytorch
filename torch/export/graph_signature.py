@@ -1,13 +1,11 @@
 # mypy: allow-untyped-defs
 import dataclasses
-import torch
-import torch.utils._pytree as pytree
 from enum import auto, Enum
 from typing import Collection, Dict, List, Mapping, Optional, Set, Union
 
 from torch._functorch._aot_autograd.schemas import GraphSignature
 from torch._library.fake_class_registry import FakeScriptObject
-
+from torch.utils import _pytree as pytree
 
 __all__ = [
     "ConstantArgument",
@@ -453,6 +451,7 @@ def _immutable_dict(items):
 
 
 def _make_argument_spec(i, node, token_names) -> ArgumentSpec:
+    from torch import SymInt, ScriptObject
     from torch._library.fake_class_registry import FakeScriptObject
     from torch._subclasses.fake_tensor import FakeTensor
 
@@ -468,9 +467,9 @@ def _make_argument_spec(i, node, token_names) -> ArgumentSpec:
         return TokenArgument(name=node.name)
     elif isinstance(val, FakeTensor):
         return TensorArgument(name=node.name)
-    elif isinstance(val, torch.SymInt):
+    elif isinstance(val, SymInt):
         return SymIntArgument(name=node.name)
-    elif isinstance(val, torch.ScriptObject):
+    elif isinstance(val, ScriptObject):
         return CustomObjArgument(name=node.name, class_fqn=val._type().qualified_name())  # type: ignore[attr-defined]
     elif isinstance(val, FakeScriptObject):
         return CustomObjArgument(
@@ -490,7 +489,6 @@ def _convert_to_export_graph_signature(
     gm: torch.fx.GraphModule,
     non_persistent_buffers: Set[str],
 ) -> ExportGraphSignature:
-
     is_joint = graph_signature.backward_signature is not None
 
     # unpack objects
@@ -589,6 +587,4 @@ def _convert_to_export_graph_signature(
 
     input_specs = [to_input_spec(inp) for inp in inputs]
     output_specs = [to_output_spec(idx, o) for idx, o in enumerate(outputs)]
-    return ExportGraphSignature(
-        input_specs=input_specs, output_specs=output_specs
-    )
+    return ExportGraphSignature(input_specs=input_specs, output_specs=output_specs)
