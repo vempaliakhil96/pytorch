@@ -4,7 +4,12 @@ import unittest
 
 import torch
 from torch._dynamo.utils import counters
-from torch._inductor.runtime.benchmarking import Benchmarker, TritonBenchmarker
+from torch._inductor import config
+from torch._inductor.runtime.benchmarking import (
+    Benchmarker,
+    InductorBenchmarker,
+    TritonBenchmarker,
+)
 from torch._inductor.test_case import run_tests, TestCase
 from torch.testing._internal.common_utils import (
     decorateIf,
@@ -17,6 +22,7 @@ from torch.testing._internal.inductor_utils import GPU_TYPE, HAS_CPU, HAS_GPU
 ALL_BENCHMARKER_CLASSES = (
     Benchmarker,
     TritonBenchmarker,
+    InductorBenchmarker,
 )
 
 
@@ -107,6 +113,61 @@ class TestBenchmarker(TestCase):
         many_devices_kwargs = cpu_kwargs
         many_devices_kwargs.update(gpu_kwargs)
         benchmarker.benchmark(fn, many_devices_args, many_devices_kwargs)
+
+    @unittest.skipIf(config.is_fbcode(), "test does not run in fbcode")
+    @parametrize(
+        "benchmarker_cls,feature_name", [(InductorBenchmarker, "inductor_benchmarker")]
+    )
+    @parametrize(
+        "config_name,config_val,expected_should_fallback",
+        [
+            ("env_val", "1", False),
+            ("env_val", "0", True),
+            ("env_val", "", None),
+            ("oss_default", True, False),
+            ("oss_default", False, True),
+        ],
+    )
+    def test_should_fallback(
+        self,
+        benchmarker_cls,
+        feature_name,
+        config_name,
+        config_val,
+        expected_should_fallback,
+    ):
+        @config.patch({f"benchmarking.{feature_name}.{config_name}": config_val})
+        def inner():
+            return benchmarker_cls().should_fallback()
+
+        if expected_should_fallback is not None:
+            self.assertEqual(expected_should_fallback, inner())
+        else:
+            self.assertEqual(
+                expected_should_fallback,
+                getattr(config.benchmarking, self.feature_name).oss_default,
+            )
+
+    @unittest.skipIf(not HAS_GPU, "requires GPU")
+    @parametrize("benchmarker_cls", (InductorBenchmarker,))
+    @parametrize("should_fallback", (True, False))
+    def test_benchmark_gpu_fallback(
+        self, benchmarker_cls, should_fallback, device=GPU_TYPE
+    ):
+        benchmarker = benchmarker_cls()
+        _, _callable = self.make_sum(device)
+        if should_fallback:
+            benchmarker.should_fallback = lambda: True
+            _ = benchmarker.benchmark_gpu(_callable)
+            self.assertEqual(
+                self.counter_value(InductorBenchmarker, "triton_do_bench"), 1
+            )
+            self.assertEqual(
+                self.counter_value(InductorBenchmarker, "benchmark_gpu"), 1
+            )
+        else:
+            benchmarker.should_fallback = lambda: False
+            self.assertEqual(self.counter_value(benchmarker_cls, "benchmark_gpu"), 1)
 
 
 if __name__ == "__main__":
