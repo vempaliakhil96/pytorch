@@ -256,7 +256,7 @@ def patch_fbcode(state: bool) -> Generator[None, None, None]:
     if hasattr(torch.version, "git_version"):
         # Currently non-fbcode
         if state:
-            old = torch.version.git_version
+            old = getattr(torch.version, "git_version")  # pyre-ignore[16]
             delattr(torch.version, "git_version")
             try:
                 yield

@@ -43,7 +43,7 @@ from torch.utils._triton import has_triton
 try:
     from .mock_cache import patch_fbcode, PatchCaches
 except ImportError:
-    from mock_cache import PatchCaches  # @manual
+    from mock_cache import PatchCaches  # pyre-ignore[21]  # @manual
 
 
 HAS_TRITON = has_triton()
@@ -800,9 +800,6 @@ class TestAutotuneCache(TestCase):
     @config.patch({"max_autotune": True})
     @parametrize("fbcode", (False,) + (True,) * config.is_fbcode())
     def test_autotune_cache(self, fbcode: bool):
-        if not fbcode:
-            self.skipTest("Redis for autotune is currently broken")
-
         class Model(torch.nn.Module):
             def forward(self, x, y, a, b):
                 return x + y, a + b

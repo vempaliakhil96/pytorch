@@ -37,7 +37,7 @@ from torch.testing._internal.inductor_utils import HAS_CPU, HAS_CUDA
 try:
     from .mock_cache import PatchCaches
 except ImportError:
-    from mock_cache import PatchCaches  # @manual
+    from mock_cache import PatchCaches  # pyre-ignore[21]  # @manual
 
 
 torch.set_float32_matmul_precision("high")
@@ -258,7 +258,7 @@ class TestMaxAutotune(TestCase):
             op: str,
             inputs: str,
             benchmark: Callable[[Any], Dict[ChoiceCaller, float]],
-        ) -> Dict[ChoiceCaller, float]:
+        ) -> Optional[Dict[ChoiceCaller, float]]:
             if benchmark is not None:
                 return benchmark(choices)
 
@@ -723,9 +723,6 @@ class TestMaxAutotuneRemoteCache(TestCase):
     def test_max_autotune_remote_caching(self, dynamic: bool):
         from unittest.mock import patch
 
-        if not config.is_fbcode():
-            self.skipTest("Redis for autotune is currently broken")
-
         def mm(a, b):
             a = torch.sin(a)
             return a @ b
@@ -796,6 +793,7 @@ class TestBenchmarkRequest(BenchmarkRequest):
         if not self.multi_device:
             assert visible_devices == self.parent_visible_devices
         else:
+            assert self.parent_visible_devices is not None
             valid_devices = self.parent_visible_devices.split(",")
             assert visible_devices in valid_devices
 
